@@ -1,4 +1,11 @@
 require('dotenv').config({ override: false });
+
+// Debug: check if env vars are loaded
+console.log('DISCORD_BOT_TOKEN exists:', !!process.env.DISCORD_BOT_TOKEN);
+console.log('DISCORD_BOT_TOKEN length:', (process.env.DISCORD_BOT_TOKEN || '').length);
+console.log('ZAI_API_KEY exists:', !!process.env.ZAI_API_KEY);
+console.log('All env keys:', Object.keys(process.env).filter(k => k.includes('DISCORD') || k.includes('ZAI') || k.includes('TOKEN')));
+
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const client = new Client({
