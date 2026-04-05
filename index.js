@@ -1,12 +1,15 @@
-require('dotenv').config({ override: false });
-
-// Debug: check if env vars are loaded
-console.log('DISCORD_BOT_TOKEN exists:', !!process.env.DISCORD_BOT_TOKEN);
-console.log('DISCORD_BOT_TOKEN length:', (process.env.DISCORD_BOT_TOKEN || '').length);
-console.log('ZAI_API_KEY exists:', !!process.env.ZAI_API_KEY);
-console.log('All env keys:', Object.keys(process.env).filter(k => k.includes('DISCORD') || k.includes('ZAI') || k.includes('TOKEN')));
-
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+
+const token = process.env.DISCORD_BOT_TOKEN;
+const zaiKey = process.env.ZAI_API_KEY;
+
+console.log('Token present:', !!token, 'length:', (token || '').length);
+console.log('ZAI key present:', !!zaiKey);
+
+if (!token) {
+  console.error('DISCORD_BOT_TOKEN is not set. Exiting.');
+  process.exit(1);
+}
 
 const client = new Client({
   intents: [
@@ -57,7 +60,7 @@ async function chatWithGLM(channelId, userMessage) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.ZAI_API_KEY}`,
+      'Authorization': `Bearer ${zaiKey}`,
     },
     body: JSON.stringify({
       model: 'glm-4.7',
@@ -98,7 +101,7 @@ client.once('ready', async () => {
       ),
   ];
 
-  const rest = new REST().setToken(process.env.DISCORD_BOT_TOKEN);
+  const rest = new REST().setToken(token);
   try {
     await rest.put(Routes.applicationCommands(APPLICATION_ID), {
       body: commands.map(cmd => cmd.toJSON()),
@@ -155,4 +158,4 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-client.login(process.env.DISCORD_BOT_TOKEN);
+client.login(token);
