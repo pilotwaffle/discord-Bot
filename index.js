@@ -79,7 +79,8 @@ async function chatWithGLM(channelId, userMessage) {
   }
 
   const data = await res.json();
-  const reply = data.choices?.[0]?.message?.content || "Got nothing. Try again.";
+  const msg = data.choices?.[0]?.message;
+  const reply = msg?.content || msg?.reasoning_content || "Got nothing. Try again.";
 
   addToHistory(channelId, 'user', userMessage);
   addToHistory(channelId, 'assistant', reply);
