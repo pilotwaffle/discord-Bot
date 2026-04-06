@@ -65,7 +65,7 @@ async function chatWithGLM(channelId, userMessage) {
       'Authorization': `Bearer ${zaiKey}`,
     },
     body: JSON.stringify({
-      model: 'glm-4.7',
+      model: 'glm-4.7-flash',
       messages,
       max_tokens: 1024,
       temperature: 0.8,
