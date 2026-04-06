@@ -131,9 +131,15 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
+// Dedup: track recently processed messages to prevent double responses
+const processedMessages = new Set();
+
 // Handle messages: @Prince mentions and !ask prefix
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
+  if (processedMessages.has(message.id)) return;
+  processedMessages.add(message.id);
+  setTimeout(() => processedMessages.delete(message.id), 30000);
 
   // !ping legacy command
   if (message.content === '!ping') {
