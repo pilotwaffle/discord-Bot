@@ -1,4 +1,5 @@
 // Prince Bot v1.0
+require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const token = process.env.DISCORD_BOT_TOKEN;
