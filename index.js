@@ -151,22 +151,41 @@ function formatStockResponse(d) {
 // Detect price queries and extract ticker
 function detectPriceQuery(text) {
   const lower = text.toLowerCase();
+  const SKIP = ['the', 'a', 'an', 'my', 'your', 'is', 'are', 'was', 'today', 'now', 'me', 'it', 'price', 'value', 'cost', 'worth', 'check', 'search', 'look', 'how', 'much', 'what', 'whats', 'for', 'of', 'up', 'at', 'get'];
+
   const pricePatterns = [
-    /(?:price|value|cost|worth|trading|check|search|look up|how much|what'?s?)\s+(?:of\s+|for\s+|is\s+)?(?:the\s+)?(\w+)/i,
+    // "price of MSTR", "cost of BTC", "value of ETH"
+    /(?:price|value|cost|worth)\s+(?:of|for)\s+(?:the\s+)?(\w+)/i,
+    // "what's MSTR at", "what's BTC trading at"
+    /what'?s?\s+(?:the\s+)?(\w+)\s+(?:at|trading|worth|doing|looking)/i,
+    // "how's ETH doing", "how is BTC"
+    /how'?s?\s+(?:the\s+)?(\w+)\s+(?:doing|looking|trading)/i,
+    // "check MSTR", "search BTC", "look up ETH"
+    /(?:check|search|look\s*up)\s+(?:the\s+)?(?:price\s+(?:of\s+)?)?(?:the\s+)?(\w+)/i,
+    // "MSTR price", "BTC value"
     /(\w+)\s+(?:price|value|cost|stock)/i,
-    /how'?s?\s+(\w+)\s+(?:doing|looking|trading)/i,
-    /(?:price|value|cost|worth|trading|at)\s+(?:of\s+|for\s+)?(?:the\s+)?(\$?\w+)/i,
+    // "what's the price of MSTR" — match the last word
+    /price\s+of\s+(\w+)/i,
+    // "how much is MSTR"
+    /how\s+much\s+is\s+(\w+)/i,
   ];
 
   for (const pattern of pricePatterns) {
     const match = lower.match(pattern);
     if (match) {
       const ticker = match[1].replace('$', '').toLowerCase();
-      // Skip common false positives
-      if (['the', 'a', 'an', 'my', 'your', 'is', 'are', 'was', 'today', 'now', 'me', 'it'].includes(ticker)) continue;
+      if (SKIP.includes(ticker)) continue;
       return ticker;
     }
   }
+
+  // Last resort: find any known ticker in the text
+  const words = lower.split(/\s+/);
+  for (const word of words) {
+    const clean = word.replace(/[^a-z]/g, '');
+    if (CRYPTO_MAP[clean]) return clean;
+  }
+
   return null;
 }
 
