@@ -151,8 +151,14 @@ client.on('messageCreate', async (message) => {
     return;
   }
 
-  // @Prince mention
+  // @Prince mention (ignore if it's a reply quoting Prince)
   if (message.mentions.has(client.user)) {
+    if (message.reference) {
+      try {
+        const ref = await message.fetchReference();
+        if (ref.author.id === client.user.id) return;
+      } catch {}
+    }
     const question = message.content.replace(/<@!?\d+>/g, '').trim();
     if (!question) return;
     await message.channel.sendTyping();
