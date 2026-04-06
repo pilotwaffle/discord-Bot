@@ -2,7 +2,7 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 
-const token = process.env.DISCORD_BOT_TOKEN;
+const token = process.env.BOT_TOKEN || process.env.DISCORD_BOT_TOKEN;
 const zaiKey = process.env.ZAI_API_KEY;
 
 console.log('Token present:', !!token, 'length:', (token || '').length);
