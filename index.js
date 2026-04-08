@@ -1,9 +1,11 @@
 // Prince Bot v2.0 — Live prices + AI chat
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const alpaca = require('./alpaca');
 
 const token = process.env.BOT_TOKEN || process.env.DISCORD_BOT_TOKEN;
 const zaiKey = process.env.ZAI_API_KEY;
+const OWNER_ID = process.env.OWNER_DISCORD_ID || '';
 
 console.log('Token present:', !!token, 'length:', (token || '').length);
 console.log('ZAI key present:', !!zaiKey);
@@ -295,6 +297,27 @@ async function handleQuestion(channelId, question) {
   return chatWithGLM(channelId, question);
 }
 
+// ============ TRADING ============
+
+function isOwner(userId) {
+  return OWNER_ID && userId === OWNER_ID;
+}
+
+async function handlePortfolio() {
+  const [acct, clock, positions, orders] = await Promise.all([
+    alpaca.getAccount(),
+    alpaca.getClock(),
+    alpaca.getPositions(),
+    alpaca.listOrders('open'),
+  ]);
+  return alpaca.formatAccount(acct, clock, positions, orders);
+}
+
+async function handleTrade(side, symbol, qty) {
+  const { status, data } = await alpaca.submitOrder(symbol, qty, side);
+  return alpaca.formatOrderResult(status, data, side);
+}
+
 // ============ DISCORD EVENTS ============
 
 client.once('ready', async () => {
@@ -316,6 +339,22 @@ client.once('ready', async () => {
       .addStringOption(opt =>
         opt.setName('ticker').setDescription('Ticker symbol (e.g. BTC, MSTR, ETH)').setRequired(true)
       ),
+    new SlashCommandBuilder()
+      .setName('portfolio')
+      .setDescription('Show paper trading account, positions, and open orders'),
+    new SlashCommandBuilder()
+      .setName('buy')
+      .setDescription('Buy shares (paper) — owner only')
+      .addStringOption(opt => opt.setName('ticker').setDescription('Stock ticker').setRequired(true))
+      .addIntegerOption(opt => opt.setName('qty').setDescription('Number of shares').setRequired(true)),
+    new SlashCommandBuilder()
+      .setName('sell')
+      .setDescription('Sell shares (paper) — owner only')
+      .addStringOption(opt => opt.setName('ticker').setDescription('Stock ticker').setRequired(true))
+      .addIntegerOption(opt => opt.setName('qty').setDescription('Number of shares').setRequired(true)),
+    new SlashCommandBuilder()
+      .setName('cancel-orders')
+      .setDescription('Cancel all open paper orders — owner only'),
   ];
 
   const rest = new REST().setToken(token);
@@ -353,6 +392,34 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.editReply(`Couldn't find price data for "${ticker}". Check the ticker and try again.`);
     }
   }
+
+  if (interaction.commandName === 'portfolio') {
+    await interaction.deferReply();
+    const reply = await handlePortfolio();
+    await interaction.editReply(reply);
+  }
+
+  if (interaction.commandName === 'buy' || interaction.commandName === 'sell') {
+    if (!isOwner(interaction.user.id)) {
+      await interaction.reply({ content: '🔒 Only the owner can place trades.', ephemeral: true });
+      return;
+    }
+    await interaction.deferReply();
+    const ticker = interaction.options.getString('ticker');
+    const qty = interaction.options.getInteger('qty');
+    const reply = await handleTrade(interaction.commandName, ticker, qty);
+    await interaction.editReply(reply);
+  }
+
+  if (interaction.commandName === 'cancel-orders') {
+    if (!isOwner(interaction.user.id)) {
+      await interaction.reply({ content: '🔒 Only the owner can cancel orders.', ephemeral: true });
+      return;
+    }
+    await interaction.deferReply();
+    const { status, data } = await alpaca.cancelAllOrders();
+    await interaction.editReply(status < 300 ? `✅ Cancelled ${Array.isArray(data) ? data.length : 'all'} orders.` : `❌ ${JSON.stringify(data)}`);
+  }
 });
 
 // Dedup: track recently processed messages to prevent double responses
@@ -384,6 +451,30 @@ client.on('messageCreate', async (message) => {
     await message.channel.sendTyping();
     const priceData = await handlePriceQuery(ticker);
     message.reply(priceData || `Couldn't find "${ticker}". Check the ticker.`);
+    return;
+  }
+
+  if (message.content === '!portfolio') {
+    await message.channel.sendTyping();
+    message.reply(await handlePortfolio());
+    return;
+  }
+
+  if (message.content.startsWith('!buy ') || message.content.startsWith('!sell ')) {
+    if (!isOwner(message.author.id)) {
+      message.reply('🔒 Only the owner can place trades.');
+      return;
+    }
+    const side = message.content.startsWith('!buy ') ? 'buy' : 'sell';
+    const parts = message.content.slice(side.length + 2).trim().split(/\s+/);
+    const [ticker, qtyStr] = parts;
+    const qty = parseInt(qtyStr, 10);
+    if (!ticker || !qty) {
+      message.reply(`Usage: \`!${side} TICKER QTY\``);
+      return;
+    }
+    await message.channel.sendTyping();
+    message.reply(await handleTrade(side, ticker, qty));
     return;
   }
 
